@@ -56,7 +56,7 @@
                             <ColumnDefinition Width="auto"/>
                         </Grid.ColumnDefinitions>
                         <Button x:Name="loadButton" Content="Load Video" Click="loadButton_Click"/>
-                        <Button Name="disconnectButton" Content="Disconnect" Click="disconnectButton_Click"  Grid.Column="2" Visibility="Collapsed"/>
+                        <Button Name="pauseButton" Content="Pause, Resume" Click="PauseButton_Click"  Grid.Column="2"/>
                     </Grid>
 
                     <StackPanel Orientation="Horizontal" Grid.Row="2">

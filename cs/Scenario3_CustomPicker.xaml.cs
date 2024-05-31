@@ -202,27 +202,23 @@ namespace BasicMediaCasting
                 //Update the UX based on the casting state
                 if (sender.State == CastingConnectionState.Connected || sender.State == CastingConnectionState.Rendering)
                 {
-                    disconnectButton.Visibility = Visibility.Visible;
                     progressText.Text = "Connected";
                     progressRing.IsActive = false;
                 }
                 else if (sender.State == CastingConnectionState.Disconnected)
                 {
-                    disconnectButton.Visibility = Visibility.Collapsed;
                     castingDevicesList.SelectedItem = null;
                     progressText.Text = "";
                     progressRing.IsActive = false;
                 }
                 else if (sender.State == CastingConnectionState.Connecting)
                 {
-                    disconnectButton.Visibility = Visibility.Collapsed;
                     progressText.Text = "Connecting";
                     progressRing.IsActive = true;
                 }
                 else
                 {
                     //Disconnecting is the remaining state
-                    disconnectButton.Visibility = Visibility.Collapsed;
                     progressText.Text = "Disconnecting";
                     progressRing.IsActive = true;
                 }
@@ -239,13 +235,34 @@ namespace BasicMediaCasting
             });
         }
 
-        private async void disconnectButton_Click(object sender, RoutedEventArgs e)
+        bool isPaused = false;
+        private void PauseButton_Click(object sender, RoutedEventArgs e)
         {
-            if (connection != null)
+            if (mediaPlayer == null)
+                return;
+
+            if (!isPaused)
             {
-                //When disconnect is clicked, the casting conneciton is disconnected.  The video should return locally to the media element.
-                await connection.DisconnectAsync();
+                if (mediaPlayer.PlaybackSession.CanPause)
+                {
+                    mediaPlayer.Pause();
+                    isPaused = true;
+                    Debug.WriteLine($"{nameof(PauseButton_Click)}: paused.......................");
+                    return;
+                }
             }
+            else
+                mediaPlayer.Play();
+
+            isPaused = false;
+            Debug.WriteLine($"{nameof(PauseButton_Click)}: resumed......................");
+            return;
+
+            //if (connection != null)
+            //{
+            //    //When disconnect is clicked, the casting conneciton is disconnected.  The video should return locally to the media element.
+            //    await connection.DisconnectAsync();
+            //}
         }
 
         private void StartMediaPlayer(TimeSpan position)
@@ -272,7 +289,7 @@ namespace BasicMediaCasting
 
         private void PlaybackSession_PositionChanged(Windows.Media.Playback.MediaPlaybackSession sender, object args)
         {
-            Debug.WriteLine($"{nameof(PlaybackSession_PositionChanged)}: invoked, position: {sender.Position}");
+            //Debug.WriteLine($"{nameof(PlaybackSession_PositionChanged)}: invoked, position: {sender.Position}");
         }
 
         private void MediaPlayer_VolumeChanged(MediaPlayer sender, object args)
