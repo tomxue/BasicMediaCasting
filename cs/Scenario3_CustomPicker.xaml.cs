@@ -19,6 +19,9 @@ using Windows.Storage.Pickers;
 using Windows.Storage.Streams;
 using Windows.Media.Casting;
 using Windows.Devices.Enumeration;
+using Windows.Media.Playback;
+using System.Diagnostics;
+using Windows.Media.Core;
 
 namespace BasicMediaCasting
 {
@@ -27,6 +30,7 @@ namespace BasicMediaCasting
         private MainPage rootPage;
         private DeviceWatcher watcher;
         private CastingConnection connection;
+        private MediaPlayer mediaPlayer;
 
         public Scenario3()
         {
@@ -40,6 +44,26 @@ namespace BasicMediaCasting
             watcher.Removed += Watcher_Removed;
             watcher.Stopped += Watcher_Stopped;
             watcher.EnumerationCompleted += Watcher_EnumerationCompleted;
+
+            video.MediaOpened += Video_MediaOpened;
+            video.VolumeChanged += Video_VolumeChanged;
+            video.MediaEnded += Video_MediaEnded;
+            mediaPlayer = new MediaPlayer();
+        }
+
+        private void Video_MediaEnded(object sender, RoutedEventArgs e)
+        {
+            Debug.WriteLine($"{nameof(Video_MediaEnded)}: invoked");
+        }
+
+        private void Video_VolumeChanged(object sender, RoutedEventArgs e)
+        {
+            Debug.WriteLine($"{nameof(Video_VolumeChanged)}: invoked");
+        }
+
+        private void Video_MediaOpened(object sender, RoutedEventArgs e)
+        {
+            Debug.WriteLine($"{nameof(Video_MediaOpened)}: invoked");
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -63,12 +87,15 @@ namespace BasicMediaCasting
             StorageFile file = await filePicker.PickSingleFileAsync();
 
             //If we got a file, load it into the media element
-            if (file != null)
-            {
-                IRandomAccessStream stream = await file.OpenAsync(FileAccessMode.Read);
-                video.SetSource(stream, file.ContentType);
-                rootPage.NotifyUser("Content Selected", NotifyType.StatusMessage);
-            }
+            //if (file != null)
+            //{
+            //    IRandomAccessStream stream = await file.OpenAsync(FileAccessMode.Read);
+            //    video.SetSource(stream, file.ContentType);
+            //    rootPage.NotifyUser("Content Selected", NotifyType.StatusMessage);
+            //}
+
+            TimeSpan timeSpan = TimeSpan.FromSeconds(10);
+            StartMediaPlayer(timeSpan);
         }
 
         private void watcherControlButton_Click(object sender, RoutedEventArgs e)
@@ -163,42 +190,43 @@ namespace BasicMediaCasting
                 connection.StateChanged += Connection_StateChanged;
 
                 //Cast the loaded video to the selected casting device.
-                await connection.RequestStartCastingAsync(video.GetAsCastingSource());
+                CastingSource source = mediaPlayer.GetAsCastingSource();
+                await connection.RequestStartCastingAsync(source);
             }
         }
 
         private async void Connection_StateChanged(CastingConnection sender, object args)
         {
-           await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
-           {
-               //Update the UX based on the casting state
-               if (sender.State == CastingConnectionState.Connected || sender.State == CastingConnectionState.Rendering)
-               {
-                   disconnectButton.Visibility = Visibility.Visible;
-                   progressText.Text = "Connected";
-                   progressRing.IsActive = false;
-               }
-               else if (sender.State == CastingConnectionState.Disconnected)
-               {
-                   disconnectButton.Visibility = Visibility.Collapsed;
-                   castingDevicesList.SelectedItem = null;
-                   progressText.Text = "";
-                   progressRing.IsActive = false;
-               }
-               else if (sender.State == CastingConnectionState.Connecting)
-               {
-                   disconnectButton.Visibility = Visibility.Collapsed;
-                   progressText.Text = "Connecting";
-                   progressRing.IsActive = true;
-               }
-               else
-               {
-                   //Disconnecting is the remaining state
-                   disconnectButton.Visibility = Visibility.Collapsed;
-                   progressText.Text = "Disconnecting";
-                   progressRing.IsActive = true;
-               }
-           });
+            await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+            {
+                //Update the UX based on the casting state
+                if (sender.State == CastingConnectionState.Connected || sender.State == CastingConnectionState.Rendering)
+                {
+                    disconnectButton.Visibility = Visibility.Visible;
+                    progressText.Text = "Connected";
+                    progressRing.IsActive = false;
+                }
+                else if (sender.State == CastingConnectionState.Disconnected)
+                {
+                    disconnectButton.Visibility = Visibility.Collapsed;
+                    castingDevicesList.SelectedItem = null;
+                    progressText.Text = "";
+                    progressRing.IsActive = false;
+                }
+                else if (sender.State == CastingConnectionState.Connecting)
+                {
+                    disconnectButton.Visibility = Visibility.Collapsed;
+                    progressText.Text = "Connecting";
+                    progressRing.IsActive = true;
+                }
+                else
+                {
+                    //Disconnecting is the remaining state
+                    disconnectButton.Visibility = Visibility.Collapsed;
+                    progressText.Text = "Disconnecting";
+                    progressRing.IsActive = true;
+                }
+            });
         }
 
         private async void Connection_ErrorOccurred(CastingConnection sender, CastingConnectionErrorOccurredEventArgs args)
@@ -218,6 +246,58 @@ namespace BasicMediaCasting
                 //When disconnect is clicked, the casting conneciton is disconnected.  The video should return locally to the media element.
                 await connection.DisconnectAsync();
             }
+        }
+
+        private void StartMediaPlayer(TimeSpan position)
+        {
+            mediaPlayer.Pause();
+            mediaPlayer.Source = MediaSource.CreateFromUri(new Uri("ms-appx:///1.mp4"));
+            mediaPlayer.PlaybackSession.Position = position;
+            mediaPlayer.Volume = 0.05;
+            mediaPlayer.PlaybackSession.NaturalVideoSizeChanged -= MediaPlayer_PlaybackSession_NaturalVideoSizeChanged;
+            mediaPlayer.PlaybackSession.NaturalVideoSizeChanged += MediaPlayer_PlaybackSession_NaturalVideoSizeChanged;
+            mediaPlayer.MediaEnded -= MediaPlayer_MediaEnded;
+            mediaPlayer.MediaEnded += MediaPlayer_MediaEnded;
+            mediaPlayer.MediaOpened -= MediaPlayer_MediaOpened;
+            mediaPlayer.MediaOpened += MediaPlayer_MediaOpened;
+            mediaPlayer.VolumeChanged -= MediaPlayer_VolumeChanged;
+            mediaPlayer.VolumeChanged += MediaPlayer_VolumeChanged;
+            mediaPlayer.PlaybackSession.PositionChanged -= PlaybackSession_PositionChanged;
+            mediaPlayer.PlaybackSession.PositionChanged += PlaybackSession_PositionChanged;
+            mediaPlayer.PlaybackSession.MediaPlayer.VolumeChanged -= MediaPlayer_VolumeChanged2;
+            mediaPlayer.PlaybackSession.MediaPlayer.VolumeChanged += MediaPlayer_VolumeChanged2;
+            mediaPlayer.Play();
+            Debug.WriteLine($"{nameof(StartMediaPlayer)}: from position: {position.TotalSeconds} s");
+        }
+
+        private void PlaybackSession_PositionChanged(Windows.Media.Playback.MediaPlaybackSession sender, object args)
+        {
+            Debug.WriteLine($"{nameof(PlaybackSession_PositionChanged)}: invoked, position: {sender.Position}");
+        }
+
+        private void MediaPlayer_VolumeChanged(MediaPlayer sender, object args)
+        {
+            Debug.WriteLine($"{nameof(MediaPlayer_VolumeChanged)}: invoked, volume; {sender.Volume}");
+        }
+
+        private void MediaPlayer_VolumeChanged2(MediaPlayer sender, object args)
+        {
+            Debug.WriteLine($"{nameof(MediaPlayer_VolumeChanged2)}: invoked");
+        }
+
+        private void MediaPlayer_MediaOpened(MediaPlayer sender, object args)
+        {
+            Debug.WriteLine($"{nameof(MediaPlayer_MediaOpened)}: invoked");
+        }
+
+        private void MediaPlayer_MediaEnded(MediaPlayer sender, object args)
+        {
+            Debug.WriteLine($"{nameof(MediaPlayer_MediaEnded)}: invoked");
+        }
+
+        private void MediaPlayer_PlaybackSession_NaturalVideoSizeChanged(MediaPlaybackSession sender, object args)
+        {
+            Debug.WriteLine($"{nameof(MediaPlayer_PlaybackSession_NaturalVideoSizeChanged)}: invoked");
         }
     }
 }
