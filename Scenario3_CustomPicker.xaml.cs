@@ -27,10 +27,14 @@ namespace BasicMediaCasting
         private MainPage rootPage;
         private DeviceWatcher watcher;
         private CastingConnection connection;
+        private DispatcherTimer timer;
 
         public Scenario3()
         {
             this.InitializeComponent();
+            timer = new DispatcherTimer();
+            timer.Interval = new TimeSpan(0, 0, 0, 0, 500);
+            timer.Tick += Timer_Tick;
 
             //Create our watcher and have it find casting devices capable of video casting
             watcher = DeviceInformation.CreateWatcher(CastingDevice.GetDeviceSelector(CastingPlaybackTypes.Video));
@@ -40,6 +44,14 @@ namespace BasicMediaCasting
             watcher.Removed += Watcher_Removed;
             watcher.Stopped += Watcher_Stopped;
             watcher.EnumerationCompleted += Watcher_EnumerationCompleted;
+        }
+
+        private void Timer_Tick(object sender, object e)
+        {
+            if (video.Position >= TimeSpan.FromSeconds(10))
+            {
+                video.Position = new TimeSpan(0, 0, 1);
+            }
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -67,8 +79,18 @@ namespace BasicMediaCasting
             {
                 IRandomAccessStream stream = await file.OpenAsync(FileAccessMode.Read);
                 video.SetSource(stream, file.ContentType);
+                video.IsLooping = true;
+                video.MediaEnded -= Video_MediaEnded;
+                video.MediaEnded += Video_MediaEnded;
+                timer.Start();
                 rootPage.NotifyUser("Content Selected", NotifyType.StatusMessage);
             }
+        }
+
+        private void Video_MediaEnded(object sender, RoutedEventArgs e)
+        {
+            video.Position = new TimeSpan(0, 0, 1);
+            video.Play();
         }
 
         private void watcherControlButton_Click(object sender, RoutedEventArgs e)
@@ -169,36 +191,36 @@ namespace BasicMediaCasting
 
         private async void Connection_StateChanged(CastingConnection sender, object args)
         {
-           await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
-           {
-               //Update the UX based on the casting state
-               if (sender.State == CastingConnectionState.Connected || sender.State == CastingConnectionState.Rendering)
-               {
-                   disconnectButton.Visibility = Visibility.Visible;
-                   progressText.Text = "Connected";
-                   progressRing.IsActive = false;
-               }
-               else if (sender.State == CastingConnectionState.Disconnected)
-               {
-                   disconnectButton.Visibility = Visibility.Collapsed;
-                   castingDevicesList.SelectedItem = null;
-                   progressText.Text = "";
-                   progressRing.IsActive = false;
-               }
-               else if (sender.State == CastingConnectionState.Connecting)
-               {
-                   disconnectButton.Visibility = Visibility.Collapsed;
-                   progressText.Text = "Connecting";
-                   progressRing.IsActive = true;
-               }
-               else
-               {
-                   //Disconnecting is the remaining state
-                   disconnectButton.Visibility = Visibility.Collapsed;
-                   progressText.Text = "Disconnecting";
-                   progressRing.IsActive = true;
-               }
-           });
+            await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+            {
+                //Update the UX based on the casting state
+                if (sender.State == CastingConnectionState.Connected || sender.State == CastingConnectionState.Rendering)
+                {
+                    disconnectButton.Visibility = Visibility.Visible;
+                    progressText.Text = "Connected";
+                    progressRing.IsActive = false;
+                }
+                else if (sender.State == CastingConnectionState.Disconnected)
+                {
+                    disconnectButton.Visibility = Visibility.Collapsed;
+                    castingDevicesList.SelectedItem = null;
+                    progressText.Text = "";
+                    progressRing.IsActive = false;
+                }
+                else if (sender.State == CastingConnectionState.Connecting)
+                {
+                    disconnectButton.Visibility = Visibility.Collapsed;
+                    progressText.Text = "Connecting";
+                    progressRing.IsActive = true;
+                }
+                else
+                {
+                    //Disconnecting is the remaining state
+                    disconnectButton.Visibility = Visibility.Collapsed;
+                    progressText.Text = "Disconnecting";
+                    progressRing.IsActive = true;
+                }
+            });
         }
 
         private async void Connection_ErrorOccurred(CastingConnection sender, CastingConnectionErrorOccurredEventArgs args)
